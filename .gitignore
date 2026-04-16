@@ -7,6 +7,7 @@ __pycache__/
 env/
 venv/
 ENV/
+.venv/
 build/
 develop-eggs/
 dist/
@@ -25,11 +26,12 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
-
-# Virtual environments
-.venv
 pip-log.txt
 pip-delete-this-directory.txt
+
+# uv
+.uv/
+uv.lock
 
 # IDE
 .vscode/
@@ -38,6 +40,7 @@ pip-delete-this-directory.txt
 *.swo
 *~
 .DS_Store
+*.iml
 
 # Project-specific
 models/              # Downloaded Whisper models (large files)
@@ -46,12 +49,27 @@ output/              # Transcription outputs
 *.avi
 *.mov
 *.mkv
+*.wav
+*.mp3
+*.m4a
+*.flac
 
 # Environment variables
 .env
 .env.local
+.env.*.local
 
-# Transcription outputs
-*_transcript.txt
-*_transcript.vtt
-*_transcript.srt
+# Docker
+.docker/
+docker-compose.override.yml
+
+# Temporary files
+*.tmp
+.tmp/
+/tmp/
+
+# OS
+.AppleDouble
+.LSOverride
+Thumbs.db
+*.bak
