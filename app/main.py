@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from app.engine import TranscriptionEngine
-from app.utils import save_upload_to_temp, cleanup_temp, is_supported_media
+from app.utils import save_upload_to_temp, cleanup_temp, is_supported_media, save_transcription
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -30,6 +30,7 @@ class TranscriptionResult(BaseModel):
     language_probability: float
     segments: list[TranscriptionSegment]
     text: str
+    output_file: str | None = None
 
 
 class StatusResponse(BaseModel):
@@ -149,11 +150,15 @@ async def transcribe(
             TranscriptionSegment(**seg) for seg in result["segments"]
         ]
 
+        # Save transcription to OUTPUT_DIR/<original_name>.txt
+        output_path = save_transcription(result["text"], file.filename)
+
         return TranscriptionResult(
             language=result["language"],
             language_probability=result["language_probability"],
             segments=segments,
-            text=result["text"]
+            text=result["text"],
+            output_file=str(output_path)
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Transcription failed: {str(e)}")

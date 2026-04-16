@@ -11,6 +11,41 @@ from fastapi import UploadFile
 SUPPORTED_FORMATS = {".mp3", ".wav", ".m4a", ".flac", ".ogg", ".aac", ".wma", ".mp4", ".avi", ".mov", ".mkv", ".webm", ".flv", ".wmv", ".3gp"}
 
 
+def get_output_path(original_filename: str, extension: str = ".txt") -> Path:
+    """
+    Build the output file path from OUTPUT_DIR env var and original filename.
+
+    Example: video.mp4 → ./output/video.txt
+
+    Args:
+        original_filename: Original uploaded file name
+        extension: Output file extension (default: .txt)
+
+    Returns:
+        Path: Full path to the output file
+    """
+    output_dir = Path(os.getenv("OUTPUT_DIR", "./output"))
+    output_dir.mkdir(parents=True, exist_ok=True)
+    stem = Path(original_filename).stem
+    return output_dir / f"{stem}{extension}"
+
+
+def save_transcription(text: str, original_filename: str) -> Path:
+    """
+    Save transcription text to OUTPUT_DIR with same stem as original file.
+
+    Args:
+        text: Transcription text to save
+        original_filename: Original uploaded file name
+
+    Returns:
+        Path: Path where the transcription was saved
+    """
+    output_path = get_output_path(original_filename)
+    output_path.write_text(text, encoding="utf-8")
+    return output_path
+
+
 def is_supported_media(filename: str) -> bool:
     """
     Check if file has a supported audio/video format.

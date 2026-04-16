@@ -42,9 +42,12 @@ uv.lock
 .DS_Store
 *.iml
 
-# Project-specific
-models/              # Downloaded Whisper models (large files)
-output/              # Transcription outputs
+# Project-specific: ignore contents but keep folder structure via .gitkeep
+models/
+input/*
+!input/.gitkeep
+output/*
+!output/.gitkeep
 *.mp4
 *.avi
 *.mov
