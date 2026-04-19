@@ -3,6 +3,17 @@ FastAPI Application for Video/Audio Transcription
 Uses Faster-Whisper with automatic GPU detection.
 """
 
+import os
+import sys
+from dotenv import load_dotenv
+load_dotenv()
+
+if sys.platform == "win32":
+    cuda_bin = os.getenv("CUDA_BIN_PATH", "").strip().strip('"')
+    if cuda_bin and os.path.isdir(cuda_bin):
+        os.environ["PATH"] = cuda_bin + os.pathsep + os.environ.get("PATH", "")
+        os.add_dll_directory(cuda_bin)
+
 from contextlib import asynccontextmanager
 from typing import Annotated
 from fastapi import FastAPI, UploadFile, File, HTTPException

@@ -4,6 +4,7 @@ Manages Faster-Whisper model with GPU auto-detection.
 """
 
 import os
+import sys
 from typing import ClassVar, Optional
 import torch
 from faster_whisper import WhisperModel
@@ -27,6 +28,7 @@ class TranscriptionEngine:
         if self._initialized:
             return
 
+        self._load_cuda_path()
         self.device, self.compute_type = self._detect_hardware()
         self.model_size = os.getenv("WHISPER_MODEL", "tiny")
 
@@ -41,25 +43,43 @@ class TranscriptionEngine:
         print(f"✓ Model loaded successfully")
 
     @staticmethod
+    def _load_cuda_path() -> None:
+        """Add CUDA_BIN_PATH from .env to DLL search path (Windows only)."""
+        cuda_bin = os.getenv("CUDA_BIN_PATH", "").strip()
+        if cuda_bin and sys.platform == "win32":
+            if os.path.isdir(cuda_bin):
+                os.add_dll_directory(cuda_bin)
+                print(f"✓ CUDA DLL path added: {cuda_bin}")
+            else:
+                print(f"⚠ CUDA_BIN_PATH not found: {cuda_bin}")
+
+    @staticmethod
     def _detect_hardware() -> tuple[str, str]:
         """
         Detect available hardware and return optimal device and compute type.
+        Controlled via WHISPER_DEVICE env var: gpu | cpu | auto (default: gpu)
 
         Returns:
             tuple: (device, compute_type)
                 - device: "cuda" or "cpu"
                 - compute_type: "float16" (GPU) or "int8" (CPU)
         """
-        if torch.cuda.is_available():
-            device = "cuda"
-            compute_type = "float16"
-            print(f"✓ GPU detected: {torch.cuda.get_device_name(0)}")
-        else:
-            device = "cpu"
-            compute_type = "int8"
-            print("ℹ No GPU detected. Using CPU with int8 quantization.")
+        setting = os.getenv("WHISPER_DEVICE", "gpu").lower()
 
-        return device, compute_type
+        if setting == "cpu":
+            print("ℹ WHISPER_DEVICE=cpu. Forcing CPU mode.")
+            return "cpu", "int8"
+
+        if setting in ("gpu", "auto"):
+            if torch.cuda.is_available():
+                print(f"✓ GPU detected: {torch.cuda.get_device_name(0)}")
+                return "cuda", "float16"
+            else:
+                print("ℹ No GPU found. Falling back to CPU.")
+                return "cpu", "int8"
+
+        print(f"⚠ Unknown WHISPER_DEVICE='{setting}', falling back to CPU.")
+        return "cpu", "int8"
 
     def transcribe(self, audio_path: str, language: Optional[str] = None) -> dict:
         """
@@ -79,10 +99,16 @@ class TranscriptionEngine:
         """
         print(f"Transcribing: {audio_path}")
 
+        beam_size = int(os.getenv("WHISPER_BEAM_SIZE", "5"))
+        vad_filter = os.getenv("WHISPER_VAD_FILTER", "false").lower() == "true"
+        condition_on_previous_text = os.getenv("WHISPER_CONDITION_ON_PREVIOUS_TEXT", "true").lower() == "true"
+
         segments, info = self.model.transcribe(
             audio_path,
             language=language,
-            beam_size=5
+            beam_size=beam_size,
+            vad_filter=vad_filter,
+            condition_on_previous_text=condition_on_previous_text,
         )
 
         # Collect segments
