@@ -76,3 +76,6 @@ docker-compose.override.yml
 .LSOverride
 Thumbs.db
 *.bak
+
+# Claude    
+.claude/
