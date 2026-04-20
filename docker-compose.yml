@@ -6,9 +6,10 @@ services:
     env_file:
       - .env
     volumes:
-      - ./models:/app/models
-      - ./input:/app/input
-      - ./output:/app/output
+      - ./storage/models:/app/storage/models
+      - ./storage/input:/app/storage/input
+      - ./storage/output:/app/storage/output
+    restart: unless-stopped
     deploy:
       resources:
         reservations:
