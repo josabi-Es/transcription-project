@@ -1,11 +1,8 @@
-"""
-FastAPI Application for Video/Audio Transcription
-Uses Faster-Whisper with automatic GPU detection.
-"""
-
 import os
 import sys
+from datetime import datetime
 from dotenv import load_dotenv
+
 load_dotenv()
 
 if sys.platform == "win32":
@@ -14,74 +11,52 @@ if sys.platform == "win32":
         os.environ["PATH"] = cuda_bin + os.pathsep + os.environ.get("PATH", "")
         os.add_dll_directory(cuda_bin)
 
-from contextlib import asynccontextmanager
-from typing import Annotated
-from fastapi import FastAPI, UploadFile, File, HTTPException
-from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from contextlib import asynccontextmanager  # noqa: E402
+from typing import Annotated  # noqa: E402
+from fastapi import FastAPI, UploadFile, File, HTTPException  # noqa: E402
+from fastapi.responses import JSONResponse  # noqa: E402
 
-from app.engine import TranscriptionEngine
-from app.utils import save_upload_to_temp, cleanup_temp, is_supported_media, save_transcription
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Data Models
-# ─────────────────────────────────────────────────────────────────────────────
-
-class TranscriptionSegment(BaseModel):
-    """A segment of transcribed text with timestamps."""
-    start: float
-    end: float
-    text: str
-
-
-class TranscriptionResult(BaseModel):
-    """Complete transcription result."""
-    language: str
-    language_probability: float
-    segments: list[TranscriptionSegment]
-    text: str
-    output_file: str | None = None
-
-
-class StatusResponse(BaseModel):
-    """Status of the transcription service."""
-    gpu_available: bool
-    device: str
-    model_size: str
-    ready: bool
+from app.engine import TranscriptionEngine  # noqa: E402
+from app.models import (  # noqa: E402
+    TranscriptionMetadata,
+    CleanSegment,
+    TranscriptionResult,
+    SummarizeRequest,
+    SummarizeResponse,
+    StatusResponse,
+)
+from app.utils import (  # noqa: E402
+    save_upload_to_temp,
+    cleanup_temp,
+    is_supported_media,
+    save_transcription,
+    save_summary,
+)
+from app.services.claude import generate_summary  # noqa: E402
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Lifespan / Startup & Shutdown
+# Lifespan
 # ─────────────────────────────────────────────────────────────────────────────
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """
-    Manage app lifecycle.
-    Load the transcription engine on startup, cleanup on shutdown.
-    """
-    # Startup
     print("🚀 Starting Transcription Service...")
     engine = TranscriptionEngine.get_instance()
     print(f"✓ Engine ready: GPU={engine.gpu_available}, Model={engine.model_size}")
-
     yield
-
-    # Shutdown
     print("🛑 Shutting down Transcription Service...")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# FastAPI App
+# App
 # ─────────────────────────────────────────────────────────────────────────────
 
 app = FastAPI(
     title="Transcription Service",
     description="Transcribe video/audio files using Faster-Whisper with GPU acceleration",
-    version="2.0.0",
-    lifespan=lifespan
+    version="3.0.0",
+    lifespan=lifespan,
 )
 
 
@@ -91,116 +66,108 @@ app = FastAPI(
 
 @app.get("/", tags=["Health"])
 async def root():
-    """Service info and health check."""
     return {
         "name": "Transcription Service",
-        "version": "2.0.0",
+        "version": "3.0.0",
         "status": "healthy",
         "endpoints": {
             "status": "GET /status",
-            "transcribe": "POST /transcribe"
-        }
+            "transcribe": "POST /transcribe",
+            "summarize": "POST /summarize",
+        },
     }
 
 
 @app.get("/status", response_model=StatusResponse, tags=["Health"])
 async def get_status():
-    """
-    Get transcription service status.
-
-    Returns:
-        StatusResponse: Current service status including GPU availability and model info
-    """
     engine = TranscriptionEngine.get_instance()
     return StatusResponse(
         gpu_available=engine.gpu_available,
         device=engine.device,
         model_size=engine.model_size,
-        ready=engine.ready
+        ready=engine.ready,
     )
 
 
 @app.post("/transcribe", response_model=TranscriptionResult, tags=["Transcription"])
 async def transcribe(
     file: Annotated[UploadFile, File(description="Audio or video file to transcribe")],
-    language: Annotated[str, "Query parameter for language code (optional, auto-detect by default)"] = None
+    language: Annotated[str, "Language code (optional, auto-detect by default)"] = None,
 ):
-    """
-    Transcribe an uploaded video or audio file.
-
-    - **file**: Upload an audio/video file (mp3, wav, mp4, mkv, etc.)
-    - **language**: Optional language code (e.g., 'es', 'en'). Auto-detected if not provided.
-
-    Returns:
-        TranscriptionResult: Transcription with language, segments, and full text
-    """
     engine = TranscriptionEngine.get_instance()
 
     if not engine.ready:
         raise HTTPException(status_code=503, detail="Transcription engine is not ready")
 
-    # Validate file
     if not is_supported_media(file.filename):
-        raise HTTPException(
-            status_code=400,
-            detail=f"Unsupported file format: {file.filename}"
-        )
+        raise HTTPException(status_code=400, detail=f"Unsupported file format: {file.filename}")
 
-    # Save uploaded file to temp
     try:
         temp_path = await save_upload_to_temp(file)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-    # Transcribe
     try:
+        date = datetime.now().isoformat(timespec="seconds")
         result = engine.transcribe(temp_path, language=language)
+        result["date"] = date
+        result["file"] = file.filename
 
-        # Convert to response model
-        segments = [
-            TranscriptionSegment(**seg) for seg in result["segments"]
-        ]
+        output_path = save_transcription(result, file.filename)
 
-        # Save transcription to OUTPUT_DIR/<original_name>.txt
-        output_path = save_transcription(result["text"], file.filename)
-
-        return TranscriptionResult(
+        metadata = TranscriptionMetadata(
+            date=result["date"],
+            file=result["file"],
             language=result["language"],
             language_probability=result["language_probability"],
-            segments=segments,
-            text=result["text"],
-            output_file=str(output_path)
+            video_duration_seconds=result["video_duration_seconds"],
+            processing_time_seconds=result["processing_time_seconds"],
+            speed_factor=result["speed_factor"],
+            model=result["model"],
+        )
+        clean_segments = [
+            CleanSegment(
+                time=f"{int(seg['start']) // 3600:02d}:{(int(seg['start']) % 3600) // 60:02d}:{int(seg['start']) % 60:02d}",
+                text=seg["text"],
+            )
+            for seg in result["segments"]
+        ]
+
+        return TranscriptionResult(
+            metadata=metadata,
+            full_text=result["text"],
+            clean_segments=clean_segments,
+            output_file=str(output_path),
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Transcription failed: {str(e)}")
     finally:
-        # Cleanup temp file
         cleanup_temp(temp_path)
+
+
+@app.post("/summarize", response_model=SummarizeResponse, tags=["Summary"])
+async def summarize(request: SummarizeRequest):
+    try:
+        summary = await generate_summary(request.transcription)
+        output_path = save_summary(summary, request.transcription["metadata"]["file"])
+        return SummarizeResponse(summary=summary, output_file=str(output_path))
+    except KeyError as e:
+        raise HTTPException(status_code=400, detail=f"Missing field in transcription: {e}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Summary generation failed: {str(e)}")
 
 
 @app.get("/health", tags=["Health"])
 async def health_check():
-    """Simple health check endpoint."""
     engine = TranscriptionEngine.get_instance()
     if not engine.ready:
-        return JSONResponse(
-            status_code=503,
-            content={"status": "unhealthy", "reason": "Engine not ready"}
-        )
+        return JSONResponse(status_code=503, content={"status": "unhealthy", "reason": "Engine not ready"})
     return {"status": "healthy"}
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Error Handlers
-# ─────────────────────────────────────────────────────────────────────────────
-
 @app.exception_handler(ValueError)
 async def value_error_handler(request, exc):
-    """Handle ValueError exceptions."""
-    return JSONResponse(
-        status_code=400,
-        content={"detail": str(exc)}
-    )
+    return JSONResponse(status_code=400, content={"detail": str(exc)})
 
 
 if __name__ == "__main__":
