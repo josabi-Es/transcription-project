@@ -43,11 +43,12 @@ pip-delete-this-directory.txt
 *.iml
 
 # Project-specific: ignore contents but keep folder structure via .gitkeep
-models/
-input/*
-!input/.gitkeep
-output/*
-!output/.gitkeep
+storage/models/*
+!storage/models/.gitkeep
+storage/input/*
+!storage/input/.gitkeep
+storage/output/*
+!storage/output/.gitkeep
 *.mp4
 *.avi
 *.mov
@@ -79,3 +80,7 @@ Thumbs.db
 
 # Claude    
 .claude/
+
+
+#logs
+logs/
