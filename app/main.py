@@ -21,6 +21,8 @@ from app.models import (  # noqa: E402
     TranscriptionMetadata,
     CleanSegment,
     TranscriptionResult,
+    FormatRequest,
+    FormatResponse,
     StatusResponse,
 )
 from app.utils import (  # noqa: E402
@@ -29,6 +31,7 @@ from app.utils import (  # noqa: E402
     is_supported_media,
     save_transcription,
 )
+from app.services.gemini import format_text, list_prompts  # noqa: E402
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -69,6 +72,8 @@ async def root():
         "endpoints": {
             "status": "GET /status",
             "transcribe": "POST /transcribe",
+            "prompts": "GET /prompts",
+            "format": "POST /format",
         },
     }
 
@@ -138,6 +143,18 @@ async def transcribe(
         raise HTTPException(status_code=500, detail=f"Transcription failed: {str(e)}")
     finally:
         cleanup_temp(temp_path)
+
+
+@app.get("/prompts", tags=["Format"])
+async def get_prompts():
+    return {"prompts": list_prompts()}
+
+
+# Sync on purpose: FastAPI runs it in a threadpool, and the Gemini call blocks.
+# Bad input raises ValueError, which the handler below turns into a 400.
+@app.post("/format", response_model=FormatResponse, tags=["Format"])
+def format_transcription(request: FormatRequest):
+    return FormatResponse(markdown=format_text(request.text, request.prompt_id))
 
 
 @app.get("/health", tags=["Health"])

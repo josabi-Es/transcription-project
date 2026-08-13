@@ -24,6 +24,15 @@ class TranscriptionResult(BaseModel):
     output_file: str | None = None
 
 
+class FormatRequest(BaseModel):
+    text: str
+    prompt_id: str
+
+
+class FormatResponse(BaseModel):
+    markdown: str
+
+
 class StatusResponse(BaseModel):
     gpu_available: bool
     device: str
