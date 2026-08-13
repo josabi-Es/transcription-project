@@ -4,6 +4,7 @@ from app.models.schemas import (
     TranscriptionResult,
     FormatRequest,
     FormatResponse,
+    ExportPdfRequest,
     StatusResponse,
 )
 
@@ -13,5 +14,6 @@ __all__ = [
     "TranscriptionResult",
     "FormatRequest",
     "FormatResponse",
+    "ExportPdfRequest",
     "StatusResponse",
 ]

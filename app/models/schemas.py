@@ -33,6 +33,12 @@ class FormatResponse(BaseModel):
     markdown: str
 
 
+class ExportPdfRequest(BaseModel):
+    markdown: str
+    # Same name used for /transcribe, so all outputs share one stem.
+    filename: str = "transcription"
+
+
 class StatusResponse(BaseModel):
     gpu_available: bool
     device: str

@@ -14,7 +14,7 @@ if sys.platform == "win32":
 from contextlib import asynccontextmanager  # noqa: E402
 from typing import Annotated  # noqa: E402
 from fastapi import FastAPI, UploadFile, File, HTTPException  # noqa: E402
-from fastapi.responses import JSONResponse  # noqa: E402
+from fastapi.responses import JSONResponse, FileResponse  # noqa: E402
 
 from app.engine import TranscriptionEngine  # noqa: E402
 from app.models import (  # noqa: E402
@@ -23,6 +23,7 @@ from app.models import (  # noqa: E402
     TranscriptionResult,
     FormatRequest,
     FormatResponse,
+    ExportPdfRequest,
     StatusResponse,
 )
 from app.utils import (  # noqa: E402
@@ -32,6 +33,7 @@ from app.utils import (  # noqa: E402
     save_transcription,
 )
 from app.services.gemini import format_text, list_prompts  # noqa: E402
+from app.services.pdf import markdown_to_pdf  # noqa: E402
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -74,6 +76,7 @@ async def root():
             "transcribe": "POST /transcribe",
             "prompts": "GET /prompts",
             "format": "POST /format",
+            "export_pdf": "POST /export-pdf",
         },
     }
 
@@ -155,6 +158,13 @@ async def get_prompts():
 @app.post("/format", response_model=FormatResponse, tags=["Format"])
 def format_transcription(request: FormatRequest):
     return FormatResponse(markdown=format_text(request.text, request.prompt_id))
+
+
+# Sync on purpose: pandoc is a blocking subprocess, FastAPI runs this in a threadpool.
+@app.post("/export-pdf", tags=["Format"])
+def export_pdf(request: ExportPdfRequest):
+    _md_path, pdf_path = markdown_to_pdf(request.markdown, request.filename)
+    return FileResponse(pdf_path, media_type="application/pdf", filename=pdf_path.name)
 
 
 @app.get("/health", tags=["Health"])
