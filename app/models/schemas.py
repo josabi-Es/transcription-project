@@ -24,15 +24,6 @@ class TranscriptionResult(BaseModel):
     output_file: str | None = None
 
 
-class SummarizeRequest(BaseModel):
-    transcription: dict
-
-
-class SummarizeResponse(BaseModel):
-    summary: str
-    output_file: str | None = None
-
-
 class StatusResponse(BaseModel):
     gpu_available: bool
     device: str

@@ -56,13 +56,6 @@ def save_transcription(result: dict, original_filename: str) -> Path:
     return output_path
 
 
-def save_summary(text: str, original_filename: str) -> Path:
-    stem = Path(original_filename).stem
-    output_path = _get_output_dir() / f"{stem}-summary.md"
-    output_path.write_text(text, encoding="utf-8")
-    return output_path
-
-
 def is_supported_media(filename: str) -> bool:
     return Path(filename).suffix.lower() in SUPPORTED_FORMATS
 

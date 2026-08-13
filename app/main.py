@@ -21,8 +21,6 @@ from app.models import (  # noqa: E402
     TranscriptionMetadata,
     CleanSegment,
     TranscriptionResult,
-    SummarizeRequest,
-    SummarizeResponse,
     StatusResponse,
 )
 from app.utils import (  # noqa: E402
@@ -30,9 +28,7 @@ from app.utils import (  # noqa: E402
     cleanup_temp,
     is_supported_media,
     save_transcription,
-    save_summary,
 )
-from app.services.claude import generate_summary  # noqa: E402
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -73,7 +69,6 @@ async def root():
         "endpoints": {
             "status": "GET /status",
             "transcribe": "POST /transcribe",
-            "summarize": "POST /summarize",
         },
     }
 
@@ -143,18 +138,6 @@ async def transcribe(
         raise HTTPException(status_code=500, detail=f"Transcription failed: {str(e)}")
     finally:
         cleanup_temp(temp_path)
-
-
-@app.post("/summarize", response_model=SummarizeResponse, tags=["Summary"])
-async def summarize(request: SummarizeRequest):
-    try:
-        summary = await generate_summary(request.transcription)
-        output_path = save_summary(summary, request.transcription["metadata"]["file"])
-        return SummarizeResponse(summary=summary, output_file=str(output_path))
-    except KeyError as e:
-        raise HTTPException(status_code=400, detail=f"Missing field in transcription: {e}")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Summary generation failed: {str(e)}")
 
 
 @app.get("/health", tags=["Health"])
