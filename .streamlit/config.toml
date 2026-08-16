@@ -1,0 +1,6 @@
+[server]
+# Default is 200 MB, too small for video. Whisper accepts long recordings.
+maxUploadSize = 2000
+
+[browser]
+gatherUsageStats = false
