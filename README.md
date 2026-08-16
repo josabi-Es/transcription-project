@@ -10,7 +10,7 @@
 
 **And it's fast.** With the default `medium` model on a 4 GB GPU, transcription runs at roughly 10x real time: a three-hour recording finishes in about 45 minutes. See your report land almost as fast as you upload the file. Full numbers and model trade-offs are in [`docs/estimate.md`](docs/estimate.md) and [`docs/models.md`](docs/models.md).
 
-<video src="docs/Video/test.mp4" controls></video>
+https://github.com/user-attachments/assets/5b064803-69ff-439d-8611-47e769be2279
 
 ## Documentation
 
