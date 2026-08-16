@@ -1,67 +1,24 @@
-# Transcription Service
+# Transcriptflow
 
-FastAPI REST service for video/audio transcription using **Faster-Whisper** with automatic GPU acceleration (CUDA).
+<p align="center">
+  <img src="https://skillicons.dev/icons?i=python,fastapi,pytorch,docker" height="55"/>
+</p>
 
----
+**Have you ever rewatched a two-hour meeting just to find one decision?** Pasting the transcript into a chat AI can work, but only if you already know how to write a good prompt and set up the right context. Most people don't want to learn that just to get a summary.
 
-## Quick Start
+**Transcriptflow does it for you.** Drop in an audio or video file and it hands back a structured document: key topics, speakers, decisions, in the format you need. No prompt to write, no context to manage. Under the hood, [Faster-Whisper](https://github.com/SYSTRAN/faster-whisper) transcribes the audio locally, with GPU acceleration when available, and the transcript goes through Gemini using ready-made prompt templates (translation, video summary, and more) to produce polished markdown, exportable straight to PDF.
 
-### Option A — Local Dev (ThinkPad / no GPU)
+**And it's fast.** With the default `medium` model on a 4 GB GPU, transcription runs at roughly 10x real time: a three-hour recording finishes in about 45 minutes. See your report land almost as fast as you upload the file. Full numbers and model trade-offs are in [`docs/estimate.md`](docs/estimate.md) and [`docs/models.md`](docs/models.md).
 
-> Requirements: Python 3.11+, FFmpeg, [uv](https://github.com/astral-sh/uv)
-
-```bash
-git clone <your-repo-url> && cd transcription-project
-cp .env.template .env
-uv sync
-uv run uvicorn app.main:app --reload
-```
-
-### Option B — Docker with GPU (HP Victus / RTX 3050 Ti)
-
-> Requirements: Docker, [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html)
-
-```bash
-git clone <your-repo-url> && cd transcription-project
-cp .env.template .env
-docker compose up --build
-```
-
-Service available at `http://localhost:8000`  
-Interactive API docs at `http://localhost:8000/docs`
-
----
-
-## Usage
-
-Place your video in `./input/`, then upload via API:
-
-```bash
-curl -X POST "http://localhost:8000/transcribe" \
-  -F "file=@input/video.mp4"
-```
-
-The transcription is saved automatically to `./output/video.txt`.
-
----
-
-## Configuration
-
-Copy `.env.template` to `.env` and adjust:
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `WHISPER_MODEL` | `tiny` | `tiny` \| `base` \| `small` \| `medium` \| `large-v3` |
-| `INPUT_DIR` | `./input` | Directory with your video/audio files |
-| `OUTPUT_DIR` | `./output` | Where `.txt` transcriptions are saved |
-
----
+<video src="docs/Video/test.mp4" controls></video>
 
 ## Documentation
 
-| Doc | Description |
-|-----|-------------|
-| [docs/api.md](docs/api.md) | API endpoints reference |
-| [docs/models.md](docs/models.md) | Model sizes, VRAM, accuracy |
-| [docs/docker.md](docs/docker.md) | Docker + GPU setup |
-| [docs/development.md](docs/development.md) | Local dev workflow |
+| I want to... | Go to |
+|---|---|
+| Deploy it with Docker | [`docs/docker.md`](docs/docker.md) |
+| Run it locally / hack on it | [`docs/local.md`](docs/local.md) |
+| See the API reference | [`docs/api.md`](docs/api.md) |
+| Set up environment variables | [`docs/enviroment.md`](docs/enviroment.md) |
+| Pick a Whisper model / know how fast it runs | [`docs/models.md`](docs/models.md), [`docs/estimate.md`](docs/estimate.md) |
+| Fix a confusing error | [`docs/gotchas.md`](docs/gotchas.md) |

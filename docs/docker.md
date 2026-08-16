@@ -3,20 +3,31 @@
 ## Requirements
 
 - Docker Engine 24+
-- [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html)
-- NVIDIA GPU drivers installed on the host
+- [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html),
+  only needed for GPU transcription; the UI container doesn't use a GPU
+- NVIDIA GPU drivers on the host
 
 ---
 
-## Run (HP Victus with RTX 3050 Ti)
+## Run
 
 ```bash
+cp .env.template .env
+# edit .env, at minimum set GEMINI_API_KEY
 docker compose up --build
 ```
 
-Service will be available at `http://localhost:8000`.
+This starts two containers, built from two separate Dockerfiles under `docker/`:
 
-To run in background:
+| Service | What it runs | Built from | GPU | URL |
+|---------|--------------|------------|-----|-----|
+| `transcriber` | FastAPI backend and Whisper | `docker/backend.Dockerfile` (CUDA base) | Yes | `http://localhost:8000` (docs at `/docs`) |
+| `ui` | Streamlit front end | `docker/ui.Dockerfile` (slim, no CUDA) | No | `http://localhost:8501` |
+
+The UI talks to the backend over the compose network (`http://transcriber:8000`),
+not through your host, so you never need to set `BACKEND_URL` yourself.
+
+To run in the background:
 ```bash
 docker compose up -d --build
 ```
@@ -26,76 +37,60 @@ docker compose up -d --build
 ## Verify GPU is Detected
 
 ```bash
-# Check NVIDIA runtime works
 docker run --rm --gpus all nvidia/cuda:11.8.0-base-ubuntu22.04 nvidia-smi
-
-# Check the service detects GPU
 curl http://localhost:8000/status
 ```
 
-Expected:
-```json
-{ "gpu_available": true, "device": "cuda", ... }
-```
+Expected: `{ "gpu_available": true, "device": "cuda", ... }`
 
 ---
 
 ## Environment Variables
 
-Set in `docker-compose.yml` under `environment:`:
+Set in `.env`, loaded via `env_file` in `docker-compose.yml`. Full reference in
+`.env.template`; the ones worth knowing up front:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `WHISPER_MODEL` | `tiny` | Model size (see [models.md](models.md)) |
-| `INPUT_DIR` | `./input` | Directory with videos to transcribe |
-| `OUTPUT_DIR` | `./output` | Directory where `.txt` files are saved |
+| `BACKEND_PORT` | `8000` | Host port for the backend |
+| `UI_PORT` | `8501` | Host port for the UI |
+| `WHISPER_MODEL` | `medium` | See [models.md](models.md) |
+| `GEMINI_API_KEY` | (none) | Required for `/format` |
+| `GEMINI_MODEL` | `gemini-3.6-flash` | Model used to reformat transcriptions |
 
 ---
 
 ## Volumes
 
-The compose file mounts these directories from your host into the container:
+The compose file mounts these from your host into the `transcriber` container:
 
 | Host | Container | Purpose |
 |------|-----------|---------|
-| `./models` | `/app/models` | Cached Whisper models (avoids re-download) |
-| `./input` | `/app/input` | Input video/audio files |
-| `./output` | `/app/output` | Output transcription files |
+| `./storage/models` | `/app/storage/models` | Cached Whisper models, avoids re-download |
+| `./storage/input` | `/app/storage/input` | Optional scratch space for local files |
+| `./storage/output` | `/app/storage/output` | `<stem>.json`, `.md` and `.pdf` per recording |
 
 ---
 
 ## Useful Commands
 
 ```bash
-# View logs
-docker compose logs -f transcriber
-
-# Stop
-docker compose down
-
-# Rebuild after code changes
-docker compose up --build
-
-# Enter container shell
-docker compose exec transcriber bash
+docker compose logs -f transcriber   # backend logs
+docker compose logs -f ui            # UI logs
+docker compose down                  # stop
+docker compose up --build            # rebuild after code changes
+docker compose exec transcriber bash # shell into the backend container
 ```
 
 ---
 
 ## Troubleshooting
 
-**GPU not detected inside container:**
+**GPU not detected inside the container:**
 ```bash
-# Verify NVIDIA Container Toolkit is installed
-nvidia-ctk --version
-
-# Restart Docker daemon after installing
-sudo systemctl restart docker
+nvidia-ctk --version                 # verify NVIDIA Container Toolkit is installed
+sudo systemctl restart docker        # restart after installing
 ```
 
-**Port already in use:**
-```yaml
-# Change port in docker-compose.yml
-ports:
-  - "8001:8000"   # host:container
-```
+**Port already in use:** change `BACKEND_PORT` or `UI_PORT` in `.env`, no need to
+edit `docker-compose.yml` directly.
