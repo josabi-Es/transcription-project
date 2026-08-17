@@ -1,6 +1,5 @@
 from app.utils.files import (
     save_transcription,
-    save_summary,
     save_upload_to_temp,
     cleanup_temp,
     is_supported_media,
@@ -9,7 +8,6 @@ from app.utils.files import (
 
 __all__ = [
     "save_transcription",
-    "save_summary",
     "save_upload_to_temp",
     "cleanup_temp",
     "is_supported_media",

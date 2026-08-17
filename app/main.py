@@ -14,15 +14,16 @@ if sys.platform == "win32":
 from contextlib import asynccontextmanager  # noqa: E402
 from typing import Annotated  # noqa: E402
 from fastapi import FastAPI, UploadFile, File, HTTPException  # noqa: E402
-from fastapi.responses import JSONResponse  # noqa: E402
+from fastapi.responses import JSONResponse, FileResponse  # noqa: E402
 
 from app.engine import TranscriptionEngine  # noqa: E402
 from app.models import (  # noqa: E402
     TranscriptionMetadata,
     CleanSegment,
     TranscriptionResult,
-    SummarizeRequest,
-    SummarizeResponse,
+    FormatRequest,
+    FormatResponse,
+    ExportPdfRequest,
     StatusResponse,
 )
 from app.utils import (  # noqa: E402
@@ -30,9 +31,9 @@ from app.utils import (  # noqa: E402
     cleanup_temp,
     is_supported_media,
     save_transcription,
-    save_summary,
 )
-from app.services.claude import generate_summary  # noqa: E402
+from app.services.gemini import format_text, list_prompts  # noqa: E402
+from app.services.pdf import markdown_to_pdf  # noqa: E402
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -73,7 +74,9 @@ async def root():
         "endpoints": {
             "status": "GET /status",
             "transcribe": "POST /transcribe",
-            "summarize": "POST /summarize",
+            "prompts": "GET /prompts",
+            "format": "POST /format",
+            "export_pdf": "POST /export-pdf",
         },
     }
 
@@ -145,16 +148,23 @@ async def transcribe(
         cleanup_temp(temp_path)
 
 
-@app.post("/summarize", response_model=SummarizeResponse, tags=["Summary"])
-async def summarize(request: SummarizeRequest):
-    try:
-        summary = await generate_summary(request.transcription)
-        output_path = save_summary(summary, request.transcription["metadata"]["file"])
-        return SummarizeResponse(summary=summary, output_file=str(output_path))
-    except KeyError as e:
-        raise HTTPException(status_code=400, detail=f"Missing field in transcription: {e}")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Summary generation failed: {str(e)}")
+@app.get("/prompts", tags=["Format"])
+async def get_prompts():
+    return {"prompts": list_prompts()}
+
+
+# Sync on purpose: FastAPI runs it in a threadpool, and the Gemini call blocks.
+# Bad input raises ValueError, which the handler below turns into a 400.
+@app.post("/format", response_model=FormatResponse, tags=["Format"])
+def format_transcription(request: FormatRequest):
+    return FormatResponse(markdown=format_text(request.text, request.prompt_id))
+
+
+# Sync on purpose: pandoc is a blocking subprocess, FastAPI runs this in a threadpool.
+@app.post("/export-pdf", tags=["Format"])
+def export_pdf(request: ExportPdfRequest):
+    _md_path, pdf_path = markdown_to_pdf(request.markdown, request.filename)
+    return FileResponse(pdf_path, media_type="application/pdf", filename=pdf_path.name)
 
 
 @app.get("/health", tags=["Health"])

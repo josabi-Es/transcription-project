@@ -8,9 +8,9 @@
 *.iml
 .DS_Store
 *.md
-README.md
+!README.md
 docker-compose.yml
-Dockerfile
+docker/
 __pycache__
 *.pyc
 *.pyo

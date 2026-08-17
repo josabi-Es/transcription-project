@@ -24,13 +24,19 @@ class TranscriptionResult(BaseModel):
     output_file: str | None = None
 
 
-class SummarizeRequest(BaseModel):
-    transcription: dict
+class FormatRequest(BaseModel):
+    text: str
+    prompt_id: str
 
 
-class SummarizeResponse(BaseModel):
-    summary: str
-    output_file: str | None = None
+class FormatResponse(BaseModel):
+    markdown: str
+
+
+class ExportPdfRequest(BaseModel):
+    markdown: str
+    # Same name used for /transcribe, so all outputs share one stem.
+    filename: str = "transcription"
 
 
 class StatusResponse(BaseModel):
