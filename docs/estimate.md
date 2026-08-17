@@ -18,7 +18,7 @@ Reference GPU: **NVIDIA GeForce RTX 3050 Ti Laptop (4 GB VRAM)**
 
 ---
 
-## Duration Estimates — `medium` model (confirmed ~1 min on GPU)
+## Duration Estimates (`medium` model, confirmed ~1 min on GPU)
 
 | Video Duration | Estimated Time (GPU) |
 |----------------|----------------------|
@@ -32,7 +32,7 @@ Reference GPU: **NVIDIA GeForce RTX 3050 Ti Laptop (4 GB VRAM)**
 
 ## Inference Hyperparameters
 
-Whisper is an encoder-decoder transformer — inference hyperparameters directly control the decoding strategy and quality/speed trade-off.
+Whisper is an encoder-decoder transformer. Its inference hyperparameters directly control the decoding strategy and quality/speed trade-off.
 
 ### Currently hardcoded in `engine.py`
 
@@ -46,7 +46,7 @@ Whisper is an encoder-decoder transformer — inference hyperparameters directly
 |-----------|---------|-------------|
 | `beam_size` | `5` | Beam search candidates. `1` = greedy (fastest). `5`–`10` for best quality |
 | `temperature` | `0` | Sampling temperature. `0` = deterministic. Higher = more creative/random |
-| `vad_filter` | `False` | Voice Activity Detection — skips silence automatically. Speeds up long videos significantly |
+| `vad_filter` | `False` | Voice Activity Detection: skips silence automatically. Speeds up long videos significantly |
 | `condition_on_previous_text` | `True` | Uses prior segment as context. Helps coherence but can propagate errors |
 | `compression_ratio_threshold` | `2.4` | Discards segments with too much repetition (hallucination filter) |
 | `log_prob_threshold` | `-1.0` | Discards low-confidence segments |
@@ -65,7 +65,7 @@ Whisper is an encoder-decoder transformer — inference hyperparameters directly
 
 ### What affects real transcription time
 
-- **Silence**: with `vad_filter=True`, Faster-Whisper skips non-speech — big speedup on long videos
+- **Silence**: with `vad_filter=True`, Faster-Whisper skips non-speech, a big speedup on long videos
 - **`beam_size`**: going from 5 → 1 is roughly 2x faster with some accuracy loss
 - **Speech density**: fast-paced podcasts take longer than slow presentations
 - **Explicit language**: passing `?language=es` skips auto-detection, saves time on long audio

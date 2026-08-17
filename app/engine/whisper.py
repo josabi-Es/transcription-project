@@ -1,20 +1,13 @@
-"""
-Transcription Engine - Singleton Pattern
-Manages Faster-Whisper model with GPU auto-detection.
-"""
-
 import os
 import sys
+import time
 from typing import ClassVar, Optional
 import torch
 from faster_whisper import WhisperModel
 
 
 class TranscriptionEngine:
-    """
-    Singleton transcription engine using Faster-Whisper.
-    Loads the model once and reuses it for all transcriptions.
-    """
+    """Singleton transcription engine using Faster-Whisper."""
 
     _instance: ClassVar[Optional["TranscriptionEngine"]] = None
 
@@ -30,21 +23,21 @@ class TranscriptionEngine:
 
         self._load_cuda_path()
         self.device, self.compute_type = self._detect_hardware()
-        self.model_size = os.getenv("WHISPER_MODEL", "tiny")
+        self.model_size = os.getenv("WHISPER_MODEL", "medium")
 
         print(f"Loading Whisper model '{self.model_size}' on {self.device} ({self.compute_type})...")
+        models_dir = os.getenv("MODELS_DIR", "./storage/models")
         self.model = WhisperModel(
             self.model_size,
             device=self.device,
             compute_type=self.compute_type,
-            download_root="./models"
+            download_root=models_dir,
         )
         self._initialized = True
-        print(f"✓ Model loaded successfully")
+        print("✓ Model loaded successfully")
 
     @staticmethod
     def _load_cuda_path() -> None:
-        """Add CUDA_BIN_PATH from .env to DLL search path (Windows only)."""
         cuda_bin = os.getenv("CUDA_BIN_PATH", "").strip()
         if cuda_bin and sys.platform == "win32":
             if os.path.isdir(cuda_bin):
@@ -55,15 +48,6 @@ class TranscriptionEngine:
 
     @staticmethod
     def _detect_hardware() -> tuple[str, str]:
-        """
-        Detect available hardware and return optimal device and compute type.
-        Controlled via WHISPER_DEVICE env var: gpu | cpu | auto (default: gpu)
-
-        Returns:
-            tuple: (device, compute_type)
-                - device: "cuda" or "cpu"
-                - compute_type: "float16" (GPU) or "int8" (CPU)
-        """
         setting = os.getenv("WHISPER_DEVICE", "gpu").lower()
 
         if setting == "cpu":
@@ -82,68 +66,60 @@ class TranscriptionEngine:
         return "cpu", "int8"
 
     def transcribe(self, audio_path: str, language: Optional[str] = None) -> dict:
-        """
-        Transcribe audio file.
-
-        Args:
-            audio_path: Path to audio/video file
-            language: Optional language code (e.g., 'es', 'en')
-
-        Returns:
-            dict: {
-                "language": str,
-                "language_probability": float,
-                "segments": [{"start": float, "end": float, "text": str}],
-                "text": str (full transcription)
-            }
-        """
         print(f"Transcribing: {audio_path}")
 
-        beam_size = int(os.getenv("WHISPER_BEAM_SIZE", "5"))
-        vad_filter = os.getenv("WHISPER_VAD_FILTER", "false").lower() == "true"
+        beam_size = int(os.getenv("WHISPER_BEAM_SIZE", "3"))
+        vad_filter = os.getenv("WHISPER_VAD_FILTER", "true").lower() == "true"
         condition_on_previous_text = os.getenv("WHISPER_CONDITION_ON_PREVIOUS_TEXT", "true").lower() == "true"
+        initial_prompt = os.getenv("WHISPER_INITIAL_PROMPT", "").strip() or None
 
+        t0 = time.time()
         segments, info = self.model.transcribe(
             audio_path,
             language=language,
             beam_size=beam_size,
             vad_filter=vad_filter,
             condition_on_previous_text=condition_on_previous_text,
+            initial_prompt=initial_prompt,
         )
+        processing_time = round(time.time() - t0, 2)
 
-        # Collect segments
         segments_list = []
-        full_text = []
+        full_text_parts = []
 
         for segment in segments:
             seg_dict = {
                 "start": round(segment.start, 2),
                 "end": round(segment.end, 2),
-                "text": segment.text.strip()
+                "text": segment.text.strip(),
             }
             segments_list.append(seg_dict)
-            full_text.append(seg_dict["text"])
+            full_text_parts.append(seg_dict["text"])
+
+        video_duration = round(segments_list[-1]["end"], 2) if segments_list else 0.0
+        speed_factor = round(video_duration / processing_time, 1) if processing_time > 0 else 0.0
 
         return {
             "language": info.language,
             "language_probability": float(info.language_probability),
             "segments": segments_list,
-            "text": " ".join(full_text)
+            "text": " ".join(full_text_parts),
+            "video_duration_seconds": video_duration,
+            "processing_time_seconds": processing_time,
+            "speed_factor": speed_factor,
+            "model": self.model_size,
         }
 
     @classmethod
     def get_instance(cls) -> "TranscriptionEngine":
-        """Get or create the singleton instance."""
         if cls._instance is None:
             cls._instance = cls()
         return cls._instance
 
     @property
     def ready(self) -> bool:
-        """Check if the engine is ready to transcribe."""
         return self._initialized and self.model is not None
 
     @property
     def gpu_available(self) -> bool:
-        """Check if GPU is available."""
         return self.device == "cuda"
